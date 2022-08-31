@@ -1,153 +1,130 @@
 package parser
 
-type State string
+import "log"
 
-const (
-	InitialState   State = "InitialState"
-	SpaceState           = "SpaceState"
-	WordState            = "WordState"
-	DotState             = "DotState"
-	NumberState          = "NumberState"
-	TimeState            = "TimeState"
-	UnderlineState       = "UnderlineState"
-)
+type State interface {
+	Transition(ctx *context, event Event) State
+}
+type Event byte
 
-type expr struct {
-	index        int
-	state        State
-	wordIndex    int
-	generateWord bool
+type context struct {
+	count int
 }
 
 const (
-	InitialIndex = -1
+	InitialCount = 0
 )
 
-func newExpr() *expr {
-	return &expr{
-		index:     InitialIndex,
-		state:     InitialState,
-		wordIndex: InitialIndex,
+var (
+	initialState = &InitialState{}
+	wordState    = &WordState{}
+	digitState   = &DigitState{}
+	floatState   = &FloatState{}
+	timeState    = &TimeState{}
+	errorState   = &ErrorState{}
+)
+
+type InitialState struct{}
+
+func (state *InitialState) Transition(ctx *context, event Event) State {
+	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') {
+		return wordState
+	}
+	if event >= '0' && event <= '9' {
+		return digitState
+	}
+	return state
+}
+
+type WordState struct{}
+
+func (state *WordState) Transition(ctx *context, event Event) State {
+	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') || event == '-' || event == '\n' {
+		return state
+	}
+	if event == ' ' {
+		ctx.count += 1
+		return initialState
+	}
+	if event == '.' {
+		ctx.count += 1
+		return initialState
+	}
+	return errorState
+}
+
+type DigitState struct{}
+
+func (state *DigitState) Transition(ctx *context, event Event) State {
+	if event >= '0' && event <= '9' {
+		return state
+	}
+	if event == ' ' {
+		ctx.count += 1
+		return initialState
+	}
+	if event == '.' {
+		return floatState
+	}
+	if event == ':' {
+		return timeState
+	}
+	if event == '-' {
+		ctx.count += 1
+		return initialState
+	}
+	return errorState
+}
+
+type TimeState struct{}
+
+func (state *TimeState) Transition(ctx *context, event Event) State {
+	if event >= '0' && event <= '9' {
+		return state
+	}
+	if event == ' ' {
+		ctx.count += 1
+		return initialState
+	}
+	return errorState
+}
+
+type FloatState struct{}
+
+func (state *FloatState) Transition(ctx *context, event Event) State {
+	if event >= '0' && event <= '9' {
+		return digitState
+	}
+	ctx.count += 1
+	return initialState
+}
+
+type ErrorState struct{}
+
+func (state *ErrorState) Transition(ctx *context, event Event) State {
+	log.Panicf("Receive Error")
+	return state
+}
+
+func newContext() *context {
+	return &context{
+		count: InitialCount,
 	}
 }
 
-func Parse(input []byte) (tokens []string) {
-	expr := newExpr()
-	cacheWord := ""
+func Parse(input []byte) (count int) {
+	ctx := newContext()
 
-	for i, b := range input {
-		expr.index = i
-		if b >= '0' && b <= '9' {
-			expr.ParseNumber()
-		} else if b == '.' {
-			expr.ParseDot()
-		} else if b == ' ' {
-			expr.ParseSpace()
-		} else if b == ':' {
-			expr.ParseColon()
-		} else if b == '-' {
-			expr.ParseUnderline()
-		} else if (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') {
-			cacheWord += string(b)
-			expr.ParseWord(cacheWord)
-		}
-
-		if expr.generateWord {
-			tokens = append(tokens, generateToken(input[expr.wordIndex:expr.
-				index]))
-			if expr.index != i {
-				expr.wordIndex = expr.index + 1
-			}
-			expr.generateWord = false
-			cacheWord = ""
-		}
+	var state State
+	state = &InitialState{}
+	for _, b := range input {
+		state = state.Transition(ctx, Event(b))
 	}
 
-	if expr.state != InitialState {
-		tokens = append(tokens, generateToken(input[expr.wordIndex:]))
+	if state != initialState {
+		ctx.count += 1
 	}
+	count = ctx.count
 
 	return
-}
-
-func (e *expr) ParseNumber() {
-	switch e.state {
-	case SpaceState, InitialState, UnderlineState:
-		e.state = NumberState
-		e.wordIndex = e.index
-	case DotState:
-		e.state = NumberState
-	}
-}
-
-func (e *expr) ParseDot() {
-	switch e.state {
-	case WordState, TimeState:
-		e.generateWord = true
-		e.state = InitialState
-	case SpaceState:
-		e.state = InitialState
-	case NumberState, InitialState:
-		e.state = DotState
-	}
-}
-
-func (e *expr) ParseSpace() {
-	switch e.state {
-	case WordState, DotState:
-		e.generateWord = true
-		e.state = InitialState
-	}
-}
-
-func (e *expr) ParseColon() {
-	switch e.state {
-	case NumberState:
-		e.state = TimeState
-	}
-}
-
-func (e *expr) ParseUnderline() {
-	switch e.state {
-	case NumberState:
-		e.generateWord = true
-		e.state = InitialState
-	}
-}
-
-func (e *expr) ParseWord(preWord string) {
-	switch e.state {
-	case InitialState, SpaceState, DotState:
-		e.wordIndex = e.index
-		e.state = WordState
-	case TimeState, NumberState:
-		if !isTime(preWord) {
-			e.state = WordState
-			e.generateWord = true
-			e.index -= len(preWord)
-		}
-	}
-}
-
-func isTime(preWord string) bool {
-	return preWord == "a" || preWord == "p" || preWord == "am" || preWord == "pm"
-}
-
-func generateToken(input []byte) string {
-	index := 0
-	token := make([]byte, 0, len(input))
-	for index < len(input) {
-		if input[index] == '-' && index+1 < len(
-			input) && input[index+1] == '\n' {
-			index += 2
-			continue
-		}
-		if index == len(input)-1 && input[index] == '.' {
-			index += 1
-			continue
-		}
-		token = append(token, input[index])
-		index += 1
-	}
-	return string(token)
 }

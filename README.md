@@ -5,7 +5,7 @@ Extract words from a string.
 Features:
 
 1. Treat `in-\nstreresting` as `insteresting`
-2. Treat `11:00 am` as one word
+2. Treat `11:00` as one word
 3. Treat `11.11` as a number
 
 Examples:
@@ -21,5 +21,5 @@ teresting 11.2 at 11:20 am`
 
 API
 ```golang
-    func Parse(input []byte) (tokens []string)
+    func Parse(input []byte) (count int)
 ```
