@@ -15,7 +15,7 @@ func TestSpaceShouldWork(t *testing.T) {
 	assert.Equal(t, 3, count)
 
 	word = "connect(Source.OutPort, FilterTransform.InPort)"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Receive Error")
+	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
 
 	word = `Hello
 World`

@@ -34,7 +34,11 @@ func (state *InitialState) Transition(ctx *context, event Event) State {
 	if event >= '0' && event <= '9' {
 		return digitState
 	}
-	return state
+	if event == ' ' || event == '-' || event == '.' ||
+		event == '\n' || event == ':' {
+		return state
+	}
+	return errorState
 }
 
 type WordState struct{}
@@ -115,7 +119,7 @@ func (state *FloatState) Transition(ctx *context, event Event) State {
 type ErrorState struct{}
 
 func (state *ErrorState) Transition(ctx *context, event Event) State {
-	log.Panicf("Receive Error")
+	log.Panicf("Illegal Event")
 	return state
 }
 
