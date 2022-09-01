@@ -2,11 +2,16 @@ package parser
 
 import "log"
 
+// State interface in the State Machine
 type State interface {
+	// Transition: peek an Event, and return next State
 	Transition(ctx *context, event Event) State
 }
+
+// Event type in the State Machine
 type Event byte
 
+// Information that needs to passed in context
 type context struct {
 	count int
 	cache [1]Event
@@ -25,6 +30,7 @@ var (
 	errorState   = &ErrorState{}
 )
 
+// InitialState which will be entered when recounting
 type InitialState struct{}
 
 func (state *InitialState) Transition(ctx *context, event Event) State {
@@ -41,16 +47,19 @@ func (state *InitialState) Transition(ctx *context, event Event) State {
 	return errorState
 }
 
+// WordState which will enter this state when a letter is received
 type WordState struct{}
 
 func (state *WordState) Transition(ctx *context, event Event) State {
 	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') {
 		return state
 	}
+
 	if event == '-' {
 		ctx.cache[0] = event
 		return state
 	}
+	// may be one word in the '-\n' case, or two word in the break line
 	if event == '\n' {
 		if ctx.cache[0] == '-' {
 			ctx.cache = [1]Event{}
@@ -66,6 +75,7 @@ func (state *WordState) Transition(ctx *context, event Event) State {
 	return errorState
 }
 
+// DigitState which means currently traversed word may be a digit.
 type DigitState struct{}
 
 func (state *DigitState) Transition(ctx *context, event Event) State {
@@ -82,6 +92,7 @@ func (state *DigitState) Transition(ctx *context, event Event) State {
 	if event == ':' {
 		return timeState
 	}
+	// distinguish the case of letters, numbers are considered as two words.
 	if event == '-' {
 		ctx.count += 1
 		return initialState
@@ -89,6 +100,7 @@ func (state *DigitState) Transition(ctx *context, event Event) State {
 	return errorState
 }
 
+// TimeState which means currently traversed word may be a time.
 type TimeState struct{}
 
 func (state *TimeState) Transition(ctx *context, event Event) State {
@@ -102,6 +114,7 @@ func (state *TimeState) Transition(ctx *context, event Event) State {
 	return errorState
 }
 
+// FloatState which means currently traversed word may be a float number.
 type FloatState struct{}
 
 func (state *FloatState) Transition(ctx *context, event Event) State {
@@ -116,6 +129,7 @@ func (state *FloatState) Transition(ctx *context, event Event) State {
 	return errorState
 }
 
+// ErrorState which means current event triggered an illegal path.
 type ErrorState struct{}
 
 func (state *ErrorState) Transition(ctx *context, event Event) State {
@@ -129,6 +143,12 @@ func newContext() *context {
 	}
 }
 
+// Parse: Word count function to slice and dice with spaces and dot as key
+// characters.
+// " Hello Word." which will be as 2 word
+// " 11.1 " which will be as 1 word
+// "in-teresting" which will be as 1 word
+// see more examples in test file
 func Parse(input []byte) (count int) {
 	ctx := newContext()
 
