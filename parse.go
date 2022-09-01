@@ -158,6 +158,10 @@ func Parse(input []byte) (count int) {
 		state = state.Transition(ctx, Event(b))
 	}
 
+	if state == errorState {
+		log.Panicf("Illegal Event")
+	}
+
 	if state != initialState {
 		ctx.count += 1
 	}
