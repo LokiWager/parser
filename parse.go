@@ -9,6 +9,7 @@ type Event byte
 
 type context struct {
 	count int
+	cache [1]Event
 }
 
 const (
@@ -39,14 +40,22 @@ func (state *InitialState) Transition(ctx *context, event Event) State {
 type WordState struct{}
 
 func (state *WordState) Transition(ctx *context, event Event) State {
-	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') || event == '-' || event == '\n' {
+	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') {
 		return state
 	}
-	if event == ' ' {
+	if event == '-' {
+		ctx.cache[0] = event
+		return state
+	}
+	if event == '\n' {
+		if ctx.cache[0] == '-' {
+			ctx.cache = [1]Event{}
+			return state
+		}
 		ctx.count += 1
 		return initialState
 	}
-	if event == '.' {
+	if event == ' ' || event == '.' {
 		ctx.count += 1
 		return initialState
 	}
@@ -95,8 +104,12 @@ func (state *FloatState) Transition(ctx *context, event Event) State {
 	if event >= '0' && event <= '9' {
 		return digitState
 	}
-	ctx.count += 1
-	return initialState
+	if event == ' ' || event == '.' {
+		ctx.count += 1
+		return initialState
+	}
+
+	return errorState
 }
 
 type ErrorState struct{}

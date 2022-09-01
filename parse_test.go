@@ -6,8 +6,20 @@ import (
 )
 
 func TestSpaceShouldWork(t *testing.T) {
-	word := " Hello World."
+	word := " Hello World.And"
 	count := Parse([]byte(word))
+	assert.Equal(t, 3, count)
+
+	word = " Hello three-year-old boy ."
+	count = Parse([]byte(word))
+	assert.Equal(t, 3, count)
+
+	word = "connect(Source.OutPort, FilterTransform.InPort)"
+	assert.Panics(t, func() { Parse([]byte(word)) }, "Receive Error")
+
+	word = `Hello
+World`
+	count = Parse([]byte(word))
 	assert.Equal(t, 2, count)
 }
 
