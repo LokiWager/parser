@@ -1,4 +1,4 @@
-### PARSE WORD
+### WORD COUNT
 
 Count the number of English words and digits in the text
 
