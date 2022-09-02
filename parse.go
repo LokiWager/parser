@@ -14,7 +14,7 @@ type Event byte
 // Information that needs to passed in context
 type context struct {
 	count int
-	cache [1]Event
+	cache bool
 }
 
 const (
@@ -54,14 +54,12 @@ func (state *WordState) Transition(ctx *context, event Event) (result State) {
 	}
 
 	if isHyphen(event) {
-		ctx.cache[0] = event
+		ctx.cache = true
 		return state
 	}
 
-	if isNewLine(event) {
-		if isHyphen(ctx.cache[0]) {
-			return state
-		}
+	if isNewLine(event) && ctx.cache {
+		return state
 	}
 
 	result = initialState
@@ -75,7 +73,7 @@ func (state *WordState) Transition(ctx *context, event Event) (result State) {
 	}
 
 	ctx.count += 1
-	ctx.cache = [1]Event{}
+	ctx.cache = false
 	return
 }
 
@@ -123,13 +121,19 @@ func WordCount(input []byte, precision bool) (count int, err error) {
 
 	var state State
 	state = &InitialState{}
-	for _, b := range append(input, EOF) {
+	for _, b := range input {
 		if !isValidEvent(Event(b)) && precision {
 			err = IllegalCharacter
 			return
 		}
 		state = state.Transition(ctx, Event(b))
+
+		if state == finialState {
+			count = ctx.count
+			return
+		}
 	}
+	state = state.Transition(ctx, EOF)
 
 	count = ctx.count
 

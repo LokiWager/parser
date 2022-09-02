@@ -108,4 +108,8 @@ func TestFinalStateShouldWork(t *testing.T) {
 	word := "hello world\000"
 	count, _ := WordCount([]byte(word), true)
 	assert.Equal(t, 2, count)
+
+	word = "hello\000 world\000"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 1, count)
 }
