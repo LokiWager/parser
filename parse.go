@@ -1,6 +1,6 @@
 package parser
 
-import "log"
+import "errors"
 
 // State interface in the State Machine
 type State interface {
@@ -19,121 +19,92 @@ type context struct {
 
 const (
 	InitialCount = 0
+	EOF          = '\000'
+	Hyphen       = '-'
 )
 
 var (
 	initialState = &InitialState{}
 	wordState    = &WordState{}
 	digitState   = &DigitState{}
-	floatState   = &FloatState{}
-	timeState    = &TimeState{}
-	errorState   = &ErrorState{}
+	finialState  = &FinalState{}
 )
+
+var IllegalCharacter = errors.New("character must be ascii code")
 
 // InitialState which will be entered when recounting
 type InitialState struct{}
 
-func (state *InitialState) Transition(ctx *context, event Event) State {
-	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') {
+func (state *InitialState) Transition(_ *context, event Event) State {
+	if isLetter(event) {
 		return wordState
 	}
-	if event >= '0' && event <= '9' {
+	if isDigit(event) {
 		return digitState
 	}
-	if event == ' ' || event == '-' || event == '.' ||
-		event == '\n' || event == ':' {
-		return state
-	}
-	return errorState
+	return state
 }
 
 // WordState which will enter this state when a letter is received
 type WordState struct{}
 
-func (state *WordState) Transition(ctx *context, event Event) State {
-	if (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z') {
+func (state *WordState) Transition(ctx *context, event Event) (result State) {
+	if isLetter(event) {
 		return state
 	}
 
-	if event == '-' {
+	if isHyphen(event) {
 		ctx.cache[0] = event
 		return state
 	}
-	// may be one word in the '-\n' case, or two word in the break line
-	if event == '\n' {
-		if ctx.cache[0] == '-' {
-			ctx.cache = [1]Event{}
+
+	if isNewLine(event) {
+		if isHyphen(ctx.cache[0]) {
 			return state
 		}
-		ctx.count += 1
-		return initialState
 	}
-	if event == ' ' || event == '.' {
-		ctx.count += 1
-		return initialState
+
+	result = initialState
+
+	if isDigit(event) {
+		result = digitState
 	}
-	return errorState
+
+	if event == EOF {
+		result = finialState
+	}
+
+	ctx.count += 1
+	ctx.cache = [1]Event{}
+	return
 }
 
 // DigitState which means currently traversed word may be a digit.
 type DigitState struct{}
 
-func (state *DigitState) Transition(ctx *context, event Event) State {
-	if event >= '0' && event <= '9' {
+func (state *DigitState) Transition(ctx *context, event Event) (result State) {
+	if isDigit(event) || isDelimiter(event) {
 		return state
 	}
-	if event == ' ' {
-		ctx.count += 1
-		return initialState
+
+	result = initialState
+
+	if isLetter(event) {
+		result = wordState
 	}
-	if event == '.' {
-		return floatState
+
+	if event == EOF {
+		result = finialState
 	}
-	if event == ':' {
-		return timeState
-	}
-	// distinguish the case of letters, numbers are considered as two words.
-	if event == '-' {
-		ctx.count += 1
-		return initialState
-	}
-	return errorState
+
+	ctx.count += 1
+	return
 }
 
-// TimeState which means currently traversed word may be a time.
-type TimeState struct{}
+// FinalState which means current event is EOF. Stop state machine.
+type FinalState struct{}
 
-func (state *TimeState) Transition(ctx *context, event Event) State {
-	if event >= '0' && event <= '9' {
-		return state
-	}
-	if event == ' ' {
-		ctx.count += 1
-		return initialState
-	}
-	return errorState
-}
-
-// FloatState which means currently traversed word may be a float number.
-type FloatState struct{}
-
-func (state *FloatState) Transition(ctx *context, event Event) State {
-	if event >= '0' && event <= '9' {
-		return digitState
-	}
-	if event == ' ' || event == '.' {
-		ctx.count += 1
-		return initialState
-	}
-
-	return errorState
-}
-
-// ErrorState which means current event triggered an illegal path.
-type ErrorState struct{}
-
-func (state *ErrorState) Transition(ctx *context, event Event) State {
-	log.Panicf("Illegal Event")
+func (state *FinalState) Transition(_ *context, _ Event) State {
 	return state
 }
 
@@ -143,29 +114,49 @@ func newContext() *context {
 	}
 }
 
-// Parse: Word count function to slice and dice with spaces and dot as key
-// characters.
-// " Hello Word." which will be as 2 word
-// " 11.1 " which will be as 1 word
-// "in-teresting" which will be as 1 word
+// WordCount Count the number of English words and digits in the text.
+// precision: when precision is false, if input contains non-ascii characters,
+// processing continues. However, return IllegalCharacter error
 // see more examples in test file
-func Parse(input []byte) (count int) {
+func WordCount(input []byte, precision bool) (count int, err error) {
 	ctx := newContext()
 
 	var state State
 	state = &InitialState{}
-	for _, b := range input {
+	for _, b := range append(input, EOF) {
+		if !isValidEvent(Event(b)) && precision {
+			err = IllegalCharacter
+			return
+		}
 		state = state.Transition(ctx, Event(b))
 	}
 
-	if state == errorState {
-		log.Panicf("Illegal Event")
-	}
-
-	if state != initialState {
-		ctx.count += 1
-	}
 	count = ctx.count
 
 	return
+}
+
+// event must be a legitimate ascii code
+func isValidEvent(event Event) bool {
+	return event <= 127
+}
+
+func isLetter(event Event) bool {
+	return (event >= 'a' && event <= 'z') || (event >= 'A' && event <= 'Z')
+}
+
+func isDigit(event Event) bool {
+	return event >= '0' && event <= '9'
+}
+
+func isNewLine(event Event) bool {
+	return event == '\n' || event == '\r'
+}
+
+func isDelimiter(event Event) bool {
+	return event == '.' || event == ':' || event == Hyphen
+}
+
+func isHyphen(event Event) bool {
+	return event == Hyphen
 }

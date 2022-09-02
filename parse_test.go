@@ -7,64 +7,105 @@ import (
 
 func TestSpaceShouldWork(t *testing.T) {
 	word := " Hello World.And"
-	count := Parse([]byte(word))
-	assert.Equal(t, 3, count)
-
-	word = " Hello three-year-old boy ."
-	count = Parse([]byte(word))
+	count, _ := WordCount([]byte(word), true)
 	assert.Equal(t, 3, count)
 
 	word = `Hello
 World`
-	count = Parse([]byte(word))
+	count, _ = WordCount([]byte(word), true)
 	assert.Equal(t, 2, count)
 
 	word = ` : - 
 Hello : 
 World`
-	count = Parse([]byte(word))
+	count, _ = WordCount([]byte(word), true)
 	assert.Equal(t, 2, count)
-}
 
-func TestNumberShouldWork(t *testing.T) {
-	word := ` Hello World 2000-100.`
-	count := Parse([]byte(word))
-	assert.Equal(t, 4, count)
-}
-
-func TestUnderlineShouldWork(t *testing.T) {
-	word := ` Hello World in-
+	word = ` Hello World in-
 teresting.`
-	count := Parse([]byte(word))
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 3, count)
+
+	word = "\tHello\rWorld in-\r\n\r\r\n\nternet"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 3, count)
+
+	word = "\tHello\rWorld in-\r\n\r\r\n\n\tternet"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 4, count)
+
+	word = "\tHello + World in-ternet * today is \\\\ Wed."
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 6, count)
+
+	word = `The online encyclopedia project, Wikipedia, is the most popular wiki-
+based website..`
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 11, count)
+}
+
+func TestDelimiterShouldWork(t *testing.T) {
+	word := " Hello three-year-old boy ."
+	count, _ := WordCount([]byte(word), true)
+	assert.Equal(t, 3, count)
+
+	word = "2000 - 100 = 1900"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 3, count)
+
+	word = "11.11 12:00 13:00:01"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 3, count)
+
+	word = "+86-9895-2700"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 1, count)
+
+	word = "0001110651 Netease, Inc./ADR"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 4, count)
+
+	word = "1.1.1.1 1.-89:01"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 2, count)
+
+	word = "zoro201sword"
+	count, _ = WordCount([]byte(word), true)
 	assert.Equal(t, 3, count)
 }
 
-func TestParseShouldWork(t *testing.T) {
-	word := ` Hello World 100-20. in-
-teresting 11.2 at 11:20 am`
-	count := Parse([]byte(word))
-	assert.Equal(t, 9, count)
+func TestNumberShouldWork(t *testing.T) {
+	word := `100`
+	count, _ := WordCount([]byte(word), true)
+	assert.Equal(t, 1, count)
+
+	word = "100\a200"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 2, count)
+
+	word = `86-
+2007`
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 2, count)
+
+	word = "86-2007"
+	count, _ = WordCount([]byte(word), true)
+	assert.Equal(t, 1, count)
 }
 
-func TestErrorStateShouldWord(t *testing.T) {
-	word := "( Hello"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
+func TestErrorShouldWork(t *testing.T) {
+	word := "中文 hello world"
+	_, err := WordCount([]byte(word), true)
+	assert.Equal(t, IllegalCharacter, err)
 
-	word = " 19.10a"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
+	word = "中文 hello world"
+	count, err := WordCount([]byte(word), false)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 2, count)
+}
 
-	word = " 19a test"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
-
-	word = " 19.10* test"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
-
-	word = " 19.* * test"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
-
-	word = " 19:10\\ test"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
-
-	word = "connect(Source.OutPort, FilterTransform.InPort)"
-	assert.Panics(t, func() { Parse([]byte(word)) }, "Illegal Event")
+func TestFinalStateShouldWork(t *testing.T) {
+	word := "hello world\000"
+	count, _ := WordCount([]byte(word), true)
+	assert.Equal(t, 2, count)
 }

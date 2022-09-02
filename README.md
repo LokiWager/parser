@@ -1,15 +1,11 @@
 ### PARSE WORD
 
-Extract words from a string.
+Count the number of English words and digits in the text
 
-Use spaces or periods as separators, and also support line feeds, see the State Machine for detailed processing logic
+**Note:**
+1. Only Support ascii codes
+2. Treat '\0' as EOF
 
-
-Legal character set：
-* a-z
-* A-Z
-* space
-* . : - \n
 
 Features:
 
@@ -17,18 +13,12 @@ Features:
 2. Treat `11:00` as one word
 3. Treat `11.11` as a number
 
-Examples:
-
-```golang
-    word := ` Hello World 100-20. in-
-teresting 11.2 at 11:20 am`
-    count := Parse([]byte(word))
-    assert.Equal(t, 9, count)
-```
-
 API
 ```golang
-    func Parse(input []byte) (count int)
+    func WordCount(input []byte, precision bool) (count int, err error)
 ```
+* When precision is false, if input contains non-ascii characters, 
+  processing continues. However, return IllegalCharacter error
+* See more examples in test file
 
 ![state machine](./docs/state%20machine.svg)
